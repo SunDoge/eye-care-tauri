@@ -25,7 +25,7 @@ const App: Component = () => {
           </progress>
         </div>
 
-        <div class="form-control w-full py-4">
+        <div class="form-control w-full py-2">
           <label class="label">
             <span>Screen on minutes: </span>
           </label>
@@ -37,25 +37,27 @@ const App: Component = () => {
         </div>
 
 
-        <div
-          class="btn-group justify-center"
-        >
-          <button
-            class="btn btn-primary"
-          >Start</button>
-          <button
-            class="btn btn-secondary"
-          >Stop</button>
-          <button
-            class="btn"
-          >Switch</button>
+        <div class="flex justify-center py-2">
+          <div
+            class="btn-group w-full"
+          >
+            <button
+              class="btn btn-primary flex-1"
+            >Start</button>
+            <button
+              class="btn btn-secondary flex-1"
+            >Stop</button>
+            <button
+              class="btn flex-1"
+            >Switch</button>
+          </div>
         </div>
 
         <div
           class="form-control w-full"
         >
           <label class="label cursor-pointer">
-            <span class="label-text">Fullscreen</span>
+            <span class="label-text text-lg">Fullscreen</span>
             <input type="checkbox" class="toggle toggle-primary" checked />
           </label>
         </div>
