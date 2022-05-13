@@ -1,11 +1,14 @@
-import { Component, createEffect, createSignal, Match, Switch } from 'solid-js';
-import { appWindow } from "@tauri-apps/api/window"
-import { AiOutlineInfoCircle, AiOutlineWarning } from 'solid-icons/ai'
+import { Component, createEffect, createSignal, Match, onMount, Switch } from 'solid-js';
+import { appWindow } from "@tauri-apps/api/window";
+import { AiOutlineInfoCircle, AiOutlineWarning } from 'solid-icons/ai';
+import { Store } from 'tauri-plugin-store-api';
 
 enum Status {
   ScreenOn,
   ScreenOff,
 }
+
+const store = new Store(".setting.dat");
 
 const App: Component = () => {
 
@@ -15,22 +18,19 @@ const App: Component = () => {
   // const [seconds, setSeconds] = createSignal(0);
   const [status, setStatus] = createSignal(Status.ScreenOn);
 
-  const [screenOnMinutes, setScreenOnMinutes] = createSignal(25);
-  const [screenOffMinutes, setScreenOffMinutes] = createSignal(5);
+
+  const [screenOnMinutesText, setScreenOnMinutesText] = createSignal("");
+  const [screenOffMinutesText, setScreenOffMinutesText] = createSignal("");
+  // const [screenOnMinutes, setScreenOnMinutes] = createSignal(25);
+  // const [screenOffMinutes, setScreenOffMinutes] = createSignal(5);
+  const screenOnMinutes = () => { return parseInt(screenOnMinutesText()) || 0; };
+  const screenOffMinutes = () => { return parseInt(screenOffMinutesText()) || 0; };
   const [totalSeconds, setTotalSeconds] = createSignal(screenOnMinutes() * 60);
   const [remainingSeconds, setRemainingSeconds] = createSignal(totalSeconds());
   const [running, setRunning] = createSignal(false);
   const [timer, setTimer] = createSignal(0);
   const [startTime, setStartTime] = createSignal(-1);
 
-
-  // const minutes = () => {
-  //   switch(status()) {
-  //     case Status.ScreenOn: {
-  //       return Math.floor()
-  //     }
-  //   } 
-  // }
 
   const minutes = () => {
     return Math.floor(remainingSeconds() / 60);
@@ -41,16 +41,44 @@ const App: Component = () => {
   }
 
   const ratio = () => {
-    return (1. - remainingSeconds() / totalSeconds());
+    if (totalSeconds() > 0) {
+      return (1. - remainingSeconds() / totalSeconds());
+    } else {
+      return 0;
+    }
   }
+
+  onMount(async () => {
+    setScreenOnMinutesText(await store.get("screenOnMinutesText") || "25");
+    setScreenOffMinutesText(await store.get("screenOffMinutesText") || "5");
+    updateTotalSeconds();
+  });
+
 
   createEffect(async () => {
     await appWindow.setFullscreen(fullscreen());
-    await appWindow.setFocus()
-  })
+    await appWindow.setFocus();
+    console.log("fullscreen", fullscreen());
+  });
+
+  createEffect(async () => {
+    if (screenOnMinutesText() != "") {
+      await store.set("screenOnMinutesText", screenOnMinutesText());
+    }
+    console.log('store screenOnMinutes', await store.get("screenOnMinutesText"));
+  });
+
+  createEffect(async () => {
+    if (screenOffMinutesText() != "") {
+      await store.set("screenOffMinutesText", screenOffMinutesText());
+    }
+    console.log('store screenOffMinutes', await store.get("screenOffMinutesText"));
+  });
+
 
 
   function switchStatus() {
+
     switch (status()) {
       case Status.ScreenOn: {
         setStatus(Status.ScreenOff);
@@ -81,7 +109,7 @@ const App: Component = () => {
   }
 
   function countDown() {
-
+    setRunning(true);
     setTimer(setInterval(async () => {
       const currentTime = Date.now();
       const delta = currentTime - startTime();
@@ -89,8 +117,9 @@ const App: Component = () => {
       setRemainingSeconds(totalSeconds() - delta / 1000);
 
       if (remainingSeconds() <= 0) {
-        setRemainingSeconds(0);
-        clearInterval(timer());
+        // setRemainingSeconds(0);
+        // clearInterval(timer());
+        stop();
 
         switch (status()) {
           case Status.ScreenOn: {
@@ -102,9 +131,24 @@ const App: Component = () => {
             break
           }
         }
+
+        switchStatus();
       }
     }, 1000))
 
+  }
+
+  function checkNumber(e: KeyboardEvent) {
+    if (!/[0-9]/.test(e.key)) {
+      e.preventDefault();
+    }
+  }
+
+  function stop() {
+    clearInterval(timer());
+    setRemainingSeconds(totalSeconds());
+    setRunning(false);
+    setStartTime(-1);
   }
 
   return (
@@ -152,9 +196,10 @@ const App: Component = () => {
             type="number" class="input input-bordered w-full"
             value={screenOnMinutes()}
             min="0"
+            onKeyPress={checkNumber}
             onInput={(e) => {
-              setScreenOnMinutes(parseInt(e.currentTarget.value));
-              updateTotalSeconds()
+              setScreenOnMinutesText(e.currentTarget.value);
+              updateTotalSeconds();
             }}
           />
           <label class="label">
@@ -164,8 +209,9 @@ const App: Component = () => {
             type="number" class="input input-bordered w-full"
             value={screenOffMinutes()}
             min="0"
+            onKeyPress={checkNumber}
             onInput={(e) => {
-              setScreenOffMinutes(parseInt(e.currentTarget.value));
+              setScreenOffMinutesText(e.currentTarget.value);
               updateTotalSeconds()
             }}
           />
@@ -181,7 +227,6 @@ const App: Component = () => {
                 <button
                   class="btn btn-primary flex-1"
                   onClick={(e) => {
-                    setRunning(true);
                     setStartTime(Date.now() - (totalSeconds() - remainingSeconds()) * 1000);
                     countDown();
                   }}
@@ -199,15 +244,19 @@ const App: Component = () => {
             </Switch>
             <button
               class="btn btn-secondary flex-1"
-              onClick={(e) => {
-                clearInterval(timer());
-                setRemainingSeconds(totalSeconds());
-                setRunning(false);
-                setStartTime(-1);
-              }}
+              onClick={stop}
             >Stop</button>
             <button
-              class="btn flex-1" onClick={(e) => switchStatus()}
+              class="btn flex-1" onClick={(e) => {
+                if (running()) {
+                  stop();
+                  switchStatus();
+                  setStartTime(Date.now());
+                  countDown();
+                } else {
+                  switchStatus();
+                }
+              }}
             >Switch</button>
           </div>
         </div>
