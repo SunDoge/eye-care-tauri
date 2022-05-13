@@ -1,8 +1,6 @@
 import { Component, createEffect, createSignal, Match, Switch } from 'solid-js';
 import { appWindow } from "@tauri-apps/api/window"
-
-
-
+import { AiOutlineInfoCircle, AiOutlineWarning } from 'solid-icons/ai'
 
 enum Status {
   ScreenOn,
@@ -23,6 +21,7 @@ const App: Component = () => {
   const [remainingSeconds, setRemainingSeconds] = createSignal(totalSeconds());
   const [running, setRunning] = createSignal(false);
   const [timer, setTimer] = createSignal(0);
+  const [startTime, setStartTime] = createSignal(-1);
 
 
   // const minutes = () => {
@@ -82,12 +81,10 @@ const App: Component = () => {
   }
 
   function countDown() {
-    const startTime = Date.now();
-    setRemainingSeconds(totalSeconds());
 
     setTimer(setInterval(async () => {
       const currentTime = Date.now();
-      const delta = currentTime - startTime;
+      const delta = currentTime - startTime();
 
       setRemainingSeconds(totalSeconds() - delta / 1000);
 
@@ -118,15 +115,17 @@ const App: Component = () => {
       >
         <Switch>
           <Match when={status() === Status.ScreenOn}>
-            <div class="alert alert-info shadow-lg">
+            <div class="alert alert-info shadow-lg my-2">
               <div>
+                <AiOutlineInfoCircle class="stroke-current flex-shrink-0 w-6 h-6" />
                 <span>Screen on</span>
               </div>
             </div>
           </Match>
           <Match when={status() === Status.ScreenOff}>
-            <div class="alert alert-error shadow-lg">
+            <div class="alert alert-warning shadow-lg my-2">
               <div>
+                <AiOutlineWarning class="stroke-current flex-shrink-0 w-6 h-6" />
                 <span>Screen off</span>
               </div>
             </div>
@@ -145,7 +144,7 @@ const App: Component = () => {
           </progress>
         </div>
 
-        <div class="form-control w-full py-2">
+        <div class="form-control w-full">
           <label class="label">
             <span>Screen on minutes: </span>
           </label>
@@ -173,19 +172,38 @@ const App: Component = () => {
         </div>
 
 
-        <div class="flex justify-center py-2">
+        <div class="flex justify-center my-2">
           <div
             class="btn-group w-96"
           >
-            <button
-              class="btn btn-primary flex-1"
-              onClick={(e) => countDown()}
-            >Start</button>
+            <Switch>
+              <Match when={!running()}>
+                <button
+                  class="btn btn-primary flex-1"
+                  onClick={(e) => {
+                    setRunning(true);
+                    setStartTime(Date.now() - (totalSeconds() - remainingSeconds()) * 1000);
+                    countDown();
+                  }}
+                >Start</button>
+              </Match>
+              <Match when={running()}>
+                <button
+                  class="btn btn-warning flex-1"
+                  onClick={(e) => {
+                    clearInterval(timer());
+                    setRunning(false);
+                  }}
+                >Pause</button>
+              </Match>
+            </Switch>
             <button
               class="btn btn-secondary flex-1"
               onClick={(e) => {
                 clearInterval(timer());
-                setRemainingSeconds(0);
+                setRemainingSeconds(totalSeconds());
+                setRunning(false);
+                setStartTime(-1);
               }}
             >Stop</button>
             <button
